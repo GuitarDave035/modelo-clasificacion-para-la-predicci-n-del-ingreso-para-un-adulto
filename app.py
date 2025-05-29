@@ -477,7 +477,10 @@ def update_roc_curve(tab):
     
     return fig
 
-server = app.server  # ← necesario para Render
-
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    import os
+    print("🚀 Iniciando Dashboard del Dataset Adult...")
+    print("📊 Datos cargados y modelos entrenados exitosamente!")
+    port = int(os.environ.get("PORT", 8050))
+    print(f"🌐 Abriendo dashboard en http://0.0.0.0:{port}/")
+    app.run_server(host='0.0.0.0', port=port)
