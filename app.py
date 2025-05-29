@@ -478,7 +478,10 @@ def update_roc_curve(tab):
     
     return fig
 
-if __name__ == "__main__":
+if __name__ == '__main__':
+    import os
+    print("🚀 Iniciando Dashboard del Dataset Adult...")
+    print("📊 Datos cargados y modelos entrenados exitosamente!")
     port = int(os.environ.get("PORT", 8050))
-    print(f"Running on port {port}")
-    app.run_server(host="0.0.0.0", port=port, debug=False)
+    print(f"🌐 Abriendo dashboard en http://0.0.0.0:{port}/")
+    app.run(host="0.0.0.0", port=port, debug=False)

@@ -5,3 +5,4 @@ plotly==6.1.2
 scikit-learn==1.6.1
 imbalanced-learn==0.13.0
 ucimlrepo==0.0.7
+gunicorn==22.0.0
