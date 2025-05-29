@@ -1,8 +1,9 @@
 import dash
-from dash import dcc, html, dash_table, Output, Input  # Añadir Output e Input
+from dash import dcc, html, dash_table, Output, Input
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_curve, auc
 import joblib
 import os
@@ -11,6 +12,12 @@ import os
 df = pd.read_pickle('data_subset.pkl')
 model_results = joblib.load('model_results.pkl')
 le = joblib.load('label_encoder.pkl')
+
+# Dividir datos como en el script de precomputación para obtener y_val
+X_pre = df.drop(columns=["income"])
+y_pre = df["income"]
+X_train, X_temp, y_train, y_temp = train_test_split(X_pre, y_pre, test_size=0.30, stratify=y_pre, random_state=42)
+X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.50, stratify=y_temp, random_state=42)
 
 # Encontrar el mejor modelo
 best_model_name = max(model_results.keys(), key=lambda x: model_results[x]['f1_score'])
@@ -30,22 +37,17 @@ app.layout = html.Div([
         html.P(f"Variables numéricas: {len(df.select_dtypes(include=['number']).columns)}"),
         html.P(f"Variables categóricas: {len(df.select_dtypes(include=['object']).columns)}"),
     ], style={'backgroundColor': '#ecf0f1', 'padding': '15px'}),
+    html.P("Histograma de Income omitido para optimizar memoria"),
+    html.P("Mapa de correlaciones omitido para optimizar memoria"),
     
-    dcc.Graph(
-        figure=px.histogram(
-            df, x='income', title="Distribución de Income",
-            labels={'income': 'Income', 'count': 'Cantidad'},
-            color_discrete_sequence=['#3498db']
-        ).update_layout(showlegend=False, width=400, height=400)
-    ),
-    
-    dcc.Graph(
-        figure=px.imshow(
-            df.select_dtypes(include=['number']).corr(),
-            title="Correlaciones Numéricas",
-            color_continuous_scale='RdBu_r',
-            width=400, height=400
-        )
+    # Visualización del Dataset (primeras 5 filas)
+    html.H2("Visualización del Dataset", style={'color': '#34495e'}),
+    dash_table.DataTable(
+        data=df.head().to_dict('records'),
+        columns=[{'name': col, 'id': col} for col in df.columns],
+        style_table={'overflowX': 'auto'},
+        style_cell={'textAlign': 'left'},
+        style_header={'backgroundColor': '#3498db', 'color': 'white'}
     ),
     
     # Pipelines
@@ -54,14 +56,11 @@ app.layout = html.Div([
         data=[
             {
                 'Modelo': modelo,
-                'Pipeline': (
-                    f"Preprocesamiento: [Num: Imputer(mean), StandardScaler; Cat: Imputer(most_frequent), OneHotEncoder]; "
-                    f"Clasificador: {str(resultados['pipeline'].named_steps['classifier']).split('(')[0]}"
-                )
+                'Clasificador': str(resultados['pipeline'].named_steps['classifier']).split('(')[0]
             }
             for modelo, resultados in model_results.items()
         ],
-        columns=[{'name': 'Modelo', 'id': 'Modelo'}, {'name': 'Pipeline', 'id': 'Pipeline'}],
+        columns=[{'name': 'Modelo', 'id': 'Modelo'}, {'name': 'Clasificador', 'id': 'Clasificador'}],
         style_cell={'textAlign': 'left'},
         style_header={'backgroundColor': '#3498db', 'color': 'white'}
     ),
@@ -91,16 +90,20 @@ app.layout = html.Div([
     Input('roc-curve-best', 'id')
 )
 def update_roc_curve(_):
-    if best_results['y_proba'] is None:
-        return go.Figure().add_annotation(text="Curva ROC no disponible", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-    fpr, tpr, _ = roc_curve(best_results['y_pred'], best_results['y_proba'])
-    roc_auc = auc(fpr, tpr)
-    fig = go.Figure([
-        go.Scatter(x=fpr, y=tpr, mode='lines', name=f'ROC (AUC = {roc_auc:.2f})', line=dict(color='darkorange')),
-        go.Scatter(x=[0, 1], y=[0, 1], mode='lines', name='Random', line=dict(color='navy', dash='dash'))
-    ])
-    fig.update_layout(title='Curva ROC', xaxis_title='False Positive Rate', yaxis_title='True Positive Rate', width=400, height=400)
-    return fig
+    try:
+        if best_results['y_proba'] is None:
+            return go.Figure().add_annotation(text="Curva ROC no disponible", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
+        fpr, tpr, _ = roc_curve(y_val, best_results['y_proba'])
+        roc_auc = auc(fpr, tpr)
+        fig = go.Figure([
+            go.Scatter(x=fpr, y=tpr, mode='lines', name=f'ROC (AUC = {roc_auc:.2f})', line=dict(color='darkorange')),
+            go.Scatter(x=[0, 1], y=[0, 1], mode='lines', name='Random', line=dict(color='navy', dash='dash'))
+        ])
+        fig.update_layout(title='Curva ROC', xaxis_title='False Positive Rate', yaxis_title='True Positive Rate', width=400, height=400)
+        return fig
+    except Exception as e:
+        print(f"Error en el callback de la curva ROC: {e}")
+        return go.Figure().add_annotation(text=f"Error al generar la curva ROC: {str(e)}", xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
