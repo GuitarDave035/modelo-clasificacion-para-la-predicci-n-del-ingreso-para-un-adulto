@@ -1,5 +1,5 @@
 import dash
-from dash import dcc, html, dash_table
+from dash import dcc, html, dash_table, Output, Input  # Añadir Output e Input
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
